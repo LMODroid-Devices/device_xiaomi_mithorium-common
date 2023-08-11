@@ -216,6 +216,9 @@ PRODUCT_PACKAGES += \
     android.hardware.health@2.1-impl \
     android.hardware.health@2.1-service
 
+PRODUCT_PACKAGES += \
+    vendor.lineage.health-service.default
+
 # HIDL
 PRODUCT_PACKAGES += \
     android.hidl.base@1.0 \
@@ -262,7 +265,8 @@ PRODUCT_PACKAGES += \
 
 # LiveDisplay
 PRODUCT_PACKAGES += \
-    vendor.lineage.livedisplay@2.0-service-sdm
+    vendor.lineage.livedisplay@2.0-service-sdm \
+    vendor.lineage.livedisplay@2.0-service-sysfs
 
 # Media
 PRODUCT_COPY_FILES += \
@@ -411,10 +415,6 @@ PRODUCT_PACKAGES += \
 # USB HAL
 PRODUCT_PACKAGES += \
     android.hardware.usb@1.0-service.basic
-
-# Tethering
-PRODUCT_PACKAGES += \
-    TetheringConfigOverlay
 
 # Vibrator
 ifneq ($(TARGET_USES_DEVICE_SPECIFIC_VIBRATOR),true)

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#define LOG_TAG "lights-xiaomi_mithorium"
+
 #include <aidl/android/hardware/light/BnLights.h>
 
 namespace aidl {
@@ -28,6 +30,12 @@ enum led_type {
     GREEN,
     BLUE,
     WHITE,
+};
+
+enum class LedBreathType {
+    UNSUPPORTED = 0,
+    BLINK,
+    BREATH,
 };
 
 class Lights : public BnLights {
@@ -48,9 +56,13 @@ private:
     uint32_t RgbaToBrightness(uint32_t color);
     bool WriteToFile(const std::string& path, uint32_t content);
 
+    int mBacklightMaxBrightness;
     std::string mBacklightNode;
+
+    enum LedBreathType mLedBreathType;
+    bool mLedUseRedAsWhite;
     bool mWhiteLed;
-    bool mBreath;
+
     HwLightState mNotification;
     HwLightState mBattery;
 };

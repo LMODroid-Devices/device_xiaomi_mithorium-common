@@ -37,13 +37,10 @@ static const std::string led_paths[] {
     [WHITE] = LED_PATH("white"),
 };
 
-static const std::string kLCDFile = "/sys/class/leds/lcd-backlight/brightness";
-static const std::string kLCDFile2 = "/sys/class/backlight/panel0-backlight/brightness";
-static const std::string kLCDMaxFile = "/sys/class/leds/lcd-backlight/max_brightness";
-static const std::string kLCDMaxFile2 = "/sys/class/backlight/panel0-backlight/max_brightness";
-
-static int LCD_MaxBrightness = 0;
-static bool LED_UseRedAsWhite = false;
+static const std::string kLCDFile = "/sys/class/backlight/panel0-backlight/brightness";
+static const std::string kLCDFile2 = "/sys/class/leds/lcd-backlight/brightness";
+static const std::string kLCDMaxFile = "/sys/class/backlight/panel0-backlight/max_brightness";
+static const std::string kLCDMaxFile2 = "/sys/class/leds/lcd-backlight/max_brightness";
 
 #define AutoHwLight(light) {.id = (int)light, .type = light, .ordinal = 0}
 
@@ -57,27 +54,31 @@ const static std::vector<HwLight> kAvailableLights = {
 Lights::Lights() {
     std::string tempstr;
 
+    // Backlight
     mBacklightNode = !access(kLCDFile.c_str(), F_OK) ? kLCDFile : kLCDFile2;
-    mWhiteLed = !!access((led_paths[GREEN] + "brightness").c_str(), W_OK);
-    LED_UseRedAsWhite = mWhiteLed && !access((led_paths[RED] + "brightness").c_str(), F_OK);
-    if (LED_UseRedAsWhite)
-        mBreath = (!access(((LED_UseRedAsWhite ? led_paths[RED] : led_paths[WHITE]) + "blink").c_str(), W_OK) || !access(((LED_UseRedAsWhite ? led_paths[RED] : led_paths[WHITE]) + "breath").c_str(), W_OK));
-    else
-        mBreath = (!access(((mWhiteLed ? led_paths[WHITE] : led_paths[RED]) + "blink").c_str(), W_OK) || !access(((mWhiteLed ? led_paths[WHITE] : led_paths[RED]) + "breath").c_str(), W_OK));
-
     ReadFileToString(!access(kLCDFile.c_str(), F_OK) ? kLCDMaxFile : kLCDMaxFile2, &tempstr, true);
-    if (!tempstr.empty()) {
-        LCD_MaxBrightness = std::stoi(tempstr);
-    }
-    if (LCD_MaxBrightness < 255)
-        LCD_MaxBrightness = 255;
+    if (!tempstr.empty())
+        mBacklightMaxBrightness = std::stoi(tempstr);
+    if (mBacklightMaxBrightness < 255)
+        mBacklightMaxBrightness = 255;
+
+    // LED
+    mWhiteLed = !!access((led_paths[GREEN] + "brightness").c_str(), W_OK);
+    mLedUseRedAsWhite = mWhiteLed && !access((led_paths[RED] + "brightness").c_str(), F_OK);
+    if (!access(((mLedUseRedAsWhite ? led_paths[RED] : led_paths[WHITE]) + "blink").c_str(), W_OK))
+        mLedBreathType = LedBreathType::BLINK;
+    else if (!access(((mLedUseRedAsWhite ? led_paths[RED] : led_paths[WHITE]) + "breath").c_str(),
+            W_OK))
+        mLedBreathType = LedBreathType::BREATH;
+    else
+        mLedBreathType = LedBreathType::UNSUPPORTED;
 }
 
 // AIDL methods
 ndk::ScopedAStatus Lights::setLightState(int id, const HwLightState& state) {
     switch (id) {
         case (int)LightType::BACKLIGHT:
-            WriteToFile(mBacklightNode, RgbaToBrightness(state.color) * LCD_MaxBrightness / 0xFF);
+            WriteToFile(mBacklightNode, RgbaToBrightness(state.color) * mBacklightMaxBrightness / 0xFF);
             break;
         case (int)LightType::BATTERY:
             mBattery = state;
@@ -127,7 +128,7 @@ void Lights::setSpeakerLightLocked(const HwLightState& state) {
         case FlashMode::HARDWARE:
         case FlashMode::TIMED:
             if (mWhiteLed) {
-                rc = setLedBreath(LED_UseRedAsWhite ? RED : WHITE, blink);
+                rc = setLedBreath(mLedUseRedAsWhite ? RED : WHITE, blink);
             } else {
                 if (!!red)
                     rc = setLedBreath(RED, blink);
@@ -142,7 +143,7 @@ void Lights::setSpeakerLightLocked(const HwLightState& state) {
         case FlashMode::NONE:
         default:
             if (mWhiteLed) {
-                rc = setLedBrightness(LED_UseRedAsWhite ? RED : WHITE, RgbaToBrightness(state.color));
+                rc = setLedBrightness(mLedUseRedAsWhite ? RED : WHITE, RgbaToBrightness(state.color));
             } else {
                 rc = setLedBrightness(RED, red);
                 rc &= setLedBrightness(GREEN, green);
@@ -162,10 +163,15 @@ void Lights::handleSpeakerBatteryLocked() {
 }
 
 bool Lights::setLedBreath(led_type led, uint32_t value) {
-    if (!access((led_paths[led] + "breath").c_str(), W_OK))
-        return WriteToFile(led_paths[led] + "breath", value);
-    else
-        return WriteToFile(led_paths[led] + "blink", value);
+    switch (mLedBreathType) {
+        case LedBreathType::BLINK:
+            return WriteToFile(led_paths[led] + "blink", value);
+        case LedBreathType::BREATH:
+            return WriteToFile(led_paths[led] + "breath", value);
+        default:
+            break;
+    }
+    return false;
 }
 
 bool Lights::setLedBrightness(led_type led, uint32_t value) {

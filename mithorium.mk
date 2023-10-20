@@ -137,7 +137,7 @@ PRODUCT_PACKAGES += \
 # Charger
 PRODUCT_PACKAGES += \
     charger_led \
-    charger_led.recovery
+    charger_led_recovery
 
 # Consumer IR
 ifneq ($(TARGET_HAS_NO_CONSUMERIR),true)
@@ -181,6 +181,10 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     android.hardware.drm-service.clearkey \
     android.hardware.drm@1.4.vendor
+
+# Dumpstate
+PRODUCT_PACKAGES += \
+    android.hardware.dumpstate-service.mithorium
 
 # Fastbootd
 PRODUCT_PACKAGES += \
@@ -355,6 +359,7 @@ PRODUCT_PACKAGES += \
 
 PRODUCT_PACKAGES += \
     init.class_main.sh \
+    init.dump_early_dmesg.sh \
     init.qcom.early_boot.sh \
     init.qcom.post_boot.sh \
     init.qcom.sensors.sh \
